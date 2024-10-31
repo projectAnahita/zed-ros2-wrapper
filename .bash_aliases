@@ -1,7 +1,5 @@
 # ~/.bash_aliases
 
-haha
-
 ### Audio devices
 # Restart PulseAudio
 alias pulse-restart='pulseaudio -k && pulseaudio --start'
