@@ -1,9 +1,21 @@
 #!/bin/bash
 set -e
 
-# setup ros2 environment
-source "/opt/ros/$ROS_DISTRO/setup.bash" --
-source "/root/ros2_ws/install/local_setup.bash" --
+# Activate virtual environment first
+source /opt/venv/bin/activate
+
+# Source ROS2 base (complete setup)
+source "/opt/ros/$ROS_DISTRO/setup.bash"
+
+# Source the base workspace (local setup only)
+if [ -f "/root/ros2_ws/install/local_setup.bash" ]; then
+    source "/root/ros2_ws/install/local_setup.bash"
+fi
+
+# Source the development workspace (local setup only)
+if [ -f "/root/workspace/ws_startup/install/local_setup.bash" ]; then
+    source "/root/workspace/ws_startup/install/local_setup.bash"
+fi
 
 # Welcome information
 echo "ZED ROS2 Docker Image"

@@ -1,65 +1,126 @@
 #!/bin/bash
 cd $(dirname $0)
 
-if [ "$#" -lt 3 ]; then
-    echo "Give Ubuntu version then CUDA version then ZED SDK version has parameters, like this:"
-    echo "./desktop_build_dockerfile_from_sdk_ubuntu_and_cuda_version.sh ubuntu22.04 cuda12.1.0 zedsdk4.1.2"
+# Default values
+DEFAULT_UBUNTU="ubuntu22.04"
+DEFAULT_CUDA="cuda12.1.0"
+DEFAULT_ZEDSDK="zedsdk4.1.4"
+DEFAULT_DOCKERFILE="Dockerfile.desktop-humble"
+DEFAULT_IMAGE_NAME="zed_ros2_desktop_image"
+USE_CACHE=true
+TAG="latest"
+
+# Help function
+show_help() {
+    echo "Usage: $0 [OPTIONS] [VERSIONS]"
+    echo
+    echo "Build Docker image for ZED ROS2 Desktop"
+    echo
+    echo "Options:"
+    echo "  -h, --help              Show this help message"
+    echo "  --no-cache             Build without using Docker cache"
+    echo "  -t, --tag TAG          Specify Docker image tag (default: latest)"
+    echo "  -f, --file DOCKERFILE  Specify Dockerfile to use (default: $DEFAULT_DOCKERFILE)"
+    echo
+    echo "Versions (optional):"
+    echo "  ubuntu=VERSION         Ubuntu version (default: $DEFAULT_UBUNTU)"
+    echo "  cuda=VERSION           CUDA version (default: $DEFAULT_CUDA)"
+    echo "  zedsdk=VERSION        ZED SDK version (default: $DEFAULT_ZEDSDK)"
+    echo
+    echo "Examples:"
+    echo "  $0 --no-cache -t dev -f Dockerfile.custom"
+    echo "  $0 cuda=cuda12.1.0 zedsdk=zedsdk4.1.2"
+    echo "  $0 # Uses all defaults"
+}
+
+# Parse command line arguments
+POSITIONAL_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --no-cache)
+            USE_CACHE=false
+            shift
+            ;;
+        -t|--tag)
+            TAG="$2"
+            shift 2
+            ;;
+        -f|--file)
+            DEFAULT_DOCKERFILE="$2"
+            shift 2
+            ;;
+        ubuntu=*)
+            DEFAULT_UBUNTU="${1#*=}"
+            shift
+            ;;
+        cuda=*)
+            DEFAULT_CUDA="${1#*=}"
+            shift
+            ;;
+        zedsdk=*)
+            DEFAULT_ZEDSDK="${1#*=}"
+            shift
+            ;;
+        *)
+            POSITIONAL_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# Check if Dockerfile exists
+if [ ! -f "$DEFAULT_DOCKERFILE" ]; then
+    echo "Error: Dockerfile '$DEFAULT_DOCKERFILE' not found"
     exit 1
 fi
 
-# Ubuntu version
-# Verify the format (l4t-r digits.digits.digits)
-if ! [[ $1 =~ ^ubuntu[0-9]+\.[0-9]+$ ]]; then
-    echo "Invalid Ubuntu version format."
+# Validate Ubuntu version
+if ! [[ $DEFAULT_UBUNTU =~ ^ubuntu[0-9]+\.[0-9]+$ ]]; then
+    echo "Invalid Ubuntu version format: $DEFAULT_UBUNTU"
     exit 1
 fi
+ubuntu_version_number="${DEFAULT_UBUNTU#ubuntu}"
+IFS='.' read -r ubuntu_major ubuntu_minor <<< "$ubuntu_version_number"
+echo "Ubuntu $ubuntu_major.$ubuntu_minor detected."
 
-ubuntu_version=$1
-ubuntu_version_number="${ubuntu_version#ubuntu}"
-
-# CUDA version
-# Verify the format (l4t-r digits.digits.digits)
-if ! [[ $2 =~ ^cuda[0-9]+\.[0-9]\.[0-9]$ ]]; then
-    echo "Invalid CUDA version format."
+# Validate CUDA version
+if ! [[ $DEFAULT_CUDA =~ ^cuda[0-9]+\.[0-9]\.[0-9]$ ]]; then
+    echo "Invalid CUDA version format: $DEFAULT_CUDA"
     exit 1
 fi
-
-cuda_version=$2
-cuda_version_number="${cuda_version#cuda}"
-
-
-# Verify the ZED SDK format (digits.digits.digits)
-if ! [[ $3 =~ ^zedsdk[0-9]\.[0-9]\.[0-9]$ ]]; then
-    echo "Invalid ZED SDK version format."
-    exit 1
-fi
-
-ZED_SDK_version=$3
-# Remove the prefix 'zedsdk-'
-zed_sdk_version_number="${ZED_SDK_version#zedsdk}"
-
-# copy the wrapper content
-rm -r ./tmp_sources
-mkdir -p ./tmp_sources
-cp -r ../zed* ./tmp_sources
-
-# Split the string and assign to variables
+cuda_version_number="${DEFAULT_CUDA#cuda}"
 IFS='.' read -r cuda_major cuda_minor cuda_patch <<< "$cuda_version_number"
 echo "CUDA $cuda_major.$cuda_minor.$cuda_patch detected."
 
-###########
-
-# Split the string and assign to variables
-IFS='.' read -r ubuntu_major ubuntu_minor <<< "$ubuntu_version_number"
-echo "Ubuntu $ubuntu_major.$ubuntu_minor detected."
-###########
-
-# Split the string and assign to variables
+# Validate ZED SDK version
+if ! [[ $DEFAULT_ZEDSDK =~ ^zedsdk[0-9]\.[0-9]\.[0-9]$ ]]; then
+    echo "Invalid ZED SDK version format: $DEFAULT_ZEDSDK"
+    exit 1
+fi
+zed_sdk_version_number="${DEFAULT_ZEDSDK#zedsdk}"
 IFS='.' read -r major minor patch <<< "$zed_sdk_version_number"
 echo "ZED SDK $major.$minor.$patch detected."
 
-echo "Building dockerfile for $1 and ZED SDK $2"
-docker build -t zed_ros2_desktop_image \
+# Prepare build context
+echo "Preparing build context..."
+rm -rf ./tmp_sources
+mkdir -p ./tmp_sources
+cp -rL ../zed* ./tmp_sources/
+cp ../.bash_aliases ./
+
+# Prepare build command
+BUILD_CMD="docker build"
+if [ "$USE_CACHE" = false ]; then
+    BUILD_CMD+=" --no-cache"
+fi
+
+echo "Building using Dockerfile: $DEFAULT_DOCKERFILE"
+echo "Building with tag: $TAG"
+$BUILD_CMD -t ${DEFAULT_IMAGE_NAME}:${TAG} \
 --build-arg ZED_SDK_MAJOR=$major \
 --build-arg ZED_SDK_MINOR=$minor \
 --build-arg ZED_SDK_PATCH=$patch \
@@ -68,4 +129,4 @@ docker build -t zed_ros2_desktop_image \
 --build-arg CUDA_MAJOR=$cuda_major \
 --build-arg CUDA_MINOR=$cuda_minor \
 --build-arg CUDA_PATCH=$cuda_patch \
--f ./Dockerfile.desktop-humble .
+-f $DEFAULT_DOCKERFILE .
