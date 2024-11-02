@@ -6,8 +6,15 @@ xhost +local:docker
 USER_ID=$(id -u)
 GROUP_ID=$(id -g)
 
+
+# Setup audio with error checking
+if ! ./audio_control.sh setup; then
+    echo "Audio setup failed!"
+    exit 1
+fi
+
 docker run --network host --gpus all --runtime nvidia -it --privileged --ipc=host --pid=host \
-  --env-file $HOME/env_configs/vars.env \
+  --env-file $HOME/vars.env \
   -e NVIDIA_DRIVER_CAPABILITIES=all \
   -e DISPLAY=$DISPLAY \
   -v /dev:/dev \
@@ -16,12 +23,15 @@ docker run --network host --gpus all --runtime nvidia -it --privileged --ipc=hos
   -v $HOME/Desktop/workspace/ws_startup:/root/workspace/ws_startup \
   -v /run/user/$USER_ID/pulse:/run/user/1000/pulse \
   -v $HOME/.config/pulse/cookie:/root/.config/pulse/cookie \
-  -e RMW_IMPLEMENTATION=rmw_fastrtps_cpp \
   -e PULSE_SERVER=unix:/run/user/1000/pulse/native \
   -e PULSE_COOKIE=/root/.config/pulse/cookie \
+  -e RMW_IMPLEMENTATION=rmw_fastrtps_cpp \
   -e ROS_LOCALHOST_ONLY=0 \
   -e ROS_DOMAIN_ID=0 \
   zed_ros2_desktop_image:ws_zed /bin/bash
+
+# Cleanup audio (will run even if docker exits with error)
+./audio_control.sh cleanup
 
 # Change ownership and permissions of the zed_docker_ai directory after exiting the container
 echo "Changing ownership and permissions of the zed_docker_ai directory..."
