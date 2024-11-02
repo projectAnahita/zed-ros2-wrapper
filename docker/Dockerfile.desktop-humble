@@ -33,6 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev zstd usbutils locales software-properties-common bash-completion \
     libgl1-mesa-glx libegl1-mesa \
     portaudio19-dev pulseaudio pulseaudio-utils pavucontrol ffmpeg alsa-utils \
+    micro \
     && rm -rf /var/lib/apt/lists/* \
     && locale-gen en_US en_US.UTF-8 \
     && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 \
@@ -140,6 +141,8 @@ RUN echo '# ROS2 and colcon command completion' >> /root/.bashrc \
 # Update ros_entrypoint.sh
 COPY ros_entrypoint.sh /sbin/ros_entrypoint.sh
 RUN chmod 755 /sbin/ros_entrypoint.sh
+
 RUN mkdir -p /root/.config/pulse
+
 ENTRYPOINT ["/sbin/ros_entrypoint.sh"]
 CMD ["bash"]

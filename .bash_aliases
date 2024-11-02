@@ -1,8 +1,5 @@
 # ~/.bash_aliases
 
-### Audio devices
-# Restart PulseAudio
-alias pulse-restart='pulseaudio -k && pulseaudio --start'
 # Test recording from microphone
 alias test-record='arecord -d 5 -f S16_LE -c 1 -r 48000 /tmp/test-mic.wav'
 # Play back test recording
@@ -11,24 +8,6 @@ alias test-play='aplay /tmp/test-mic.wav'
 alias list-sinks='pactl list short sinks'
 # List short version of sources (input devices)
 alias list-sources='pactl list short sources'
-
-# Docker Management Aliases
-# Grab the current running container id given its name
-alias docker_exec1="docker exec -it \$(docker ps --filter ancestor=zed_ros2_desktop_image:latest --format \"{{.ID}}\") bash"
-# Stop all running containers
-alias docker-stop-all='docker stop $(docker ps -q)'
-# Remove all stopped containers
-alias docker-rm-all='docker rm $(docker ps -a -q)'
-# Stop and Remove All Containers
-alias docker-stop-rm-all='docker stop $(docker ps -q) && docker rm $(docker ps -a -q)'
-# Deletes all the images
-alias docker-full-clean='docker system prune -af --volumes'
-# Safe system prune, remove unused containers, networks, and build cache (keeps images and volumes)
-alias docker-safe-clean='docker system prune -f'
-# Prune only dangling images (those not associated with a container)
-alias docker-rmi-dangling='docker image prune -f'
-# Prune unused volumes
-alias docker-volume-prune='docker volume prune -f'
 
 ### KUKA
 alias build_colcon='colcon build --parallel-workers $(getconf _NPROCESSORS_ONLN)'
