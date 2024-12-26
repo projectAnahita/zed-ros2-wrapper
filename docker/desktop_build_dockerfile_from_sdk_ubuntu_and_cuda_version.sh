@@ -110,7 +110,17 @@ echo "Preparing build context..."
 rm -rf ./tmp_sources
 mkdir -p ./tmp_sources
 cp -rL ../zed* ./tmp_sources/
-cp ../.bash_aliases ./
+
+# # Ensure dos2unix is installed
+# if ! command -v dos2unix &> /dev/null; then
+#     echo "dos2unix not found. Installing..."
+#     sudo apt-get update && sudo apt-get install -y dos2unix
+# fi
+# 
+# # Convert line endings for scripts (excluding tmp_sources)
+# echo "Converting line endings for scripts..."
+# find . -maxdepth 1 -type f \( -name "*.sh" -o -name ".bash_aliases" -o -name "Dockerfile*" \) -exec dos2unix {} \;
+
 
 # Prepare build command
 BUILD_CMD="docker build"
@@ -130,3 +140,8 @@ $BUILD_CMD -t ${DEFAULT_IMAGE_NAME}:${TAG} \
 --build-arg CUDA_MINOR=$cuda_minor \
 --build-arg CUDA_PATCH=$cuda_patch \
 -f $DEFAULT_DOCKERFILE .
+
+# Clean up temporary files
+echo "Cleaning up..."
+rm -rf ./tmp_sources
+rm -f ./.bash_aliases

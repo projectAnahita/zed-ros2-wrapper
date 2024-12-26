@@ -14,10 +14,36 @@ setup_audio() {
     
     # Load echo cancellation with known working settings
     echo "Setting up echo cancellation..."
-    pactl load-module module-echo-cancel source_name=$MIC_SOURCE sink_name=$SPEAKER_SINK channels=1 rate=16000 aec_method=webrtc aec_args="analog_gain_control=0,digital_gain_control=1,extended_filter=1,high_pass_filter=1,noise_suppression=1"
+    # pactl load-module module-echo-cancel source_name=$MIC_SOURCE sink_name=$SPEAKER_SINK channels=1 rate=16000 aec_method=webrtc aec_args="analog_gain_control=0,digital_gain_control=1,extended_filter=1,high_pass_filter=1,noise_suppression=1"
 
-    # Wait a moment for devices to be created
-    sleep 1
+    # Load echo cancellation module
+    echo "Setting up echo cancellation..."
+    MODULE_ID=$(pactl load-module module-echo-cancel \
+    aec_method=webrtc \
+    source_master=$MIC_SOURCE \
+    sink_master=$SPEAKER_SINK \
+    source_name=echo-cancel-source \
+    sink_name=echo-cancel-sink \
+    channels=1 \
+    rate=16000 \
+    aec_args=analog_gain_control=0,digital_gain_control=1,extended_filter=1,high_pass_filter=1,noise_suppression=1)
+    
+    echo $MODULE_ID
+    
+    # Wait for devices to be created
+    echo "Waiting for echo cancelled devices..."
+    for i in {1..10}; do
+        if pactl list sources | grep -q "echo-cancel-source"; then
+            echo "Echo cancelled devices found"
+            pactl set-default-source echo-cancel-source
+            pactl set-default-sink echo-cancel-sink
+            return 0
+        fi
+        sleep 1
+    done
+
+    # # Wait a moment for devices to be created
+    # sleep 1
 
     # Check which suffix exists and set defaults accordingly
     echo "Setting echo cancelled devices as defaults..."
