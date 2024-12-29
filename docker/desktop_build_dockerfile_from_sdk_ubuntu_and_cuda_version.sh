@@ -8,7 +8,7 @@ DEFAULT_ZEDSDK="zedsdk4.1.4"
 DEFAULT_DOCKERFILE="Dockerfile.desktop-humble"
 DEFAULT_IMAGE_NAME="zed_ros2_desktop_image"
 USE_CACHE=true
-TAG="latest"
+TAG="latestplus"
 
 # Help function
 show_help() {
@@ -109,18 +109,9 @@ echo "ZED SDK $major.$minor.$patch detected."
 echo "Preparing build context..."
 rm -rf ./tmp_sources
 mkdir -p ./tmp_sources
+
+# Copy ROS2 packages
 cp -rL ../zed* ./tmp_sources/
-
-# # Ensure dos2unix is installed
-# if ! command -v dos2unix &> /dev/null; then
-#     echo "dos2unix not found. Installing..."
-#     sudo apt-get update && sudo apt-get install -y dos2unix
-# fi
-# 
-# # Convert line endings for scripts (excluding tmp_sources)
-# echo "Converting line endings for scripts..."
-# find . -maxdepth 1 -type f \( -name "*.sh" -o -name ".bash_aliases" -o -name "Dockerfile*" \) -exec dos2unix {} \;
-
 
 # Prepare build command
 BUILD_CMD="docker build"
@@ -144,4 +135,3 @@ $BUILD_CMD -t ${DEFAULT_IMAGE_NAME}:${TAG} \
 # Clean up temporary files
 echo "Cleaning up..."
 rm -rf ./tmp_sources
-rm -f ./.bash_aliases

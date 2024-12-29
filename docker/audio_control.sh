@@ -68,14 +68,33 @@ setup_audio() {
 
 # Function to restore original audio settings
 cleanup_audio() {
-    echo "Restoring PulseAudio state..."
-    pulseaudio -k
-    sleep 1
-    pulseaudio --start
-    sleep 1
-    pactl set-default-source "$INITIAL_SOURCE"
-    pactl set-default-sink "$INITIAL_SINK"
-    echo "PulseAudio restored to initial state"
+    echo "Cleaning up audio..."
+    
+    # Only try to restore if we have the initial values
+    if [ -n "$INITIAL_SOURCE" ] && [ -n "$INITIAL_SINK" ]; then
+        echo "Restoring to initial source: $INITIAL_SOURCE"
+        echo "Restoring to initial sink: $INITIAL_SINK"
+        
+        # Kill pulseaudio gracefully
+        pactl exit 2>/dev/null || true
+        pulseaudio -k 2>/dev/null || true
+        sleep 1  # Give it time to cleanup
+        
+        # Restart pulseaudio
+        pulseaudio --start
+        sleep 1  # Wait for it to start
+        
+        # Restore defaults only if pulseaudio is running
+        if pulseaudio --check; then
+            pactl set-default-source "$INITIAL_SOURCE" 2>/dev/null || true
+            pactl set-default-sink "$INITIAL_SINK" 2>/dev/null || true
+            echo "PulseAudio restored to initial state"
+        else
+            echo "Warning: PulseAudio not running, skipping restore"
+        fi
+    else
+        echo "Warning: No initial audio state saved, skipping restore"
+    fi
 }
 
 # Check for command line argument

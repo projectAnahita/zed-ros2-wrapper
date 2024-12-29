@@ -67,6 +67,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && locale-gen en_US en_US.UTF-8 \
     && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/* \
+    && wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
+    && dpkg -i cuda-keyring_1.1-1_all.deb \
+    && apt-get update \
+    && apt-get install -y cudnn-cuda-12 \
+    && rm -f cuda-keyring_1.1-1_all.deb \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up ROS2 repository
@@ -132,7 +138,11 @@ RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
 RUN python3 -m venv /opt/venv && \
     . /opt/venv/bin/activate && \
     pip install --upgrade pip && \
+    # Install PyTorch packages first with CUDA support
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
+    # Install the rest of the packages from PyPI
     pip install \
+        typeguard \
         'numpy<2' \
         argcomplete \
         black \
@@ -176,38 +186,20 @@ RUN python3 -m venv /opt/venv && \
         vcstool \
         webrtcvad \
         nvidia-ml-py3 \
-        typeguard \
         pytest-asyncio \
-        python-dotenv
+        python-dotenv \
+        faster-whisper \
+        transformers \
+        elevenlabs \
+        'accelerate>=0.26.0'
         
 
 # Setup shell environment
+COPY .bashrc /root/.bashrc
 COPY .bash_aliases /root/.bash_aliases
-RUN echo '# Activate Python virtual environment' >> /root/.bashrc && \
-    echo 'source /opt/venv/bin/activate' >> /root/.bashrc && \
-    echo '' >> /root/.bashrc && \
-    echo '# Source ROS2 environments' >> /root/.bashrc && \
-    echo 'source /opt/ros/${ROS_DISTRO}/setup.bash' >> /root/.bashrc && \
-    echo 'if [ -f /root/workspace/ws_zed/install/local_setup.bash ]; then' >> /root/.bashrc && \
-    echo '    source /root/workspace/ws_zed/install/local_setup.bash' >> /root/.bashrc && \
-    echo 'fi' >> /root/.bashrc && \
-    echo 'if [ -f /root/workspace/ws_startup/install/local_setup.bash ]; then' >> /root/.bashrc && \
-    echo '    source /root/workspace/ws_startup/install/local_setup.bash' >> /root/.bashrc && \
-    echo 'fi' >> /root/.bashrc && \
-    echo '' >> /root/.bashrc && \
-    echo '# ROS2 and colcon command completion' >> /root/.bashrc && \
-    echo 'eval "$(register-python-argcomplete3 ros2)"' >> /root/.bashrc && \
-    echo 'eval "$(register-python-argcomplete3 colcon)"' >> /root/.bashrc && \
-    echo '' >> /root/.bashrc && \
-    echo '# Bash completion' >> /root/.bashrc && \
-    echo 'if [ -f /etc/bash_completion ] && ! shopt -oq posix; then' >> /root/.bashrc && \
-    echo '    . /etc/bash_completion' >> /root/.bashrc && \
-    echo 'fi' >> /root/.bashrc && \
-    echo '' >> /root/.bashrc && \
-    echo '# Source aliases' >> /root/.bashrc && \
-    echo 'if [ -f ~/.bash_aliases ]; then' >> /root/.bashrc && \
-    echo '    . ~/.bash_aliases' >> /root/.bashrc && \
-    echo 'fi' >> /root/.bashrc 
+
+# Set final working directory
+WORKDIR /root/workspace/ws_startup/artifex
 
 # Final setup
 COPY ros_entrypoint.sh /sbin/ros_entrypoint.sh

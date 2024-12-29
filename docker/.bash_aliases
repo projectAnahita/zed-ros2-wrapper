@@ -1,18 +1,13 @@
-# ~/.bash_aliases
-
 # Test recording from microphone
 alias test-record='arecord -d 5 -f S16_LE -c 1 -r 48000 /tmp/test-mic.wav'
-# Play back test recording
 alias test-play='aplay /tmp/test-mic.wav'
-# List short version of sinks (output devices)
 alias list-sinks='pactl list short sinks'
-# List short version of sources (input devices)
 alias list-sources='pactl list short sources'
 
 ### KUKA
 alias build_colcon='colcon build --parallel-workers $(getconf _NPROCESSORS_ONLN)'
 alias clean_build_colcon='rm -rf build/ install/ log/ && build_colcon --symlink-install'
-alias connect_kuka_pc='sshpass -p 'admin' ssh -X kuka@192.168.1.14'
+alias connect_kuka_pc='sshpass -p "admin" ssh -X kuka@192.168.1.14'
 alias kuka_reset='ros2 lifecycle set robot_manager cleanup'
 alias kuka_start='ros2 lifecycle set robot_manager configure && ros2 lifecycle set robot_manager activate'
 alias kuka_deactivate='ros2 lifecycle set robot_manager deactivate'
@@ -30,21 +25,19 @@ alias vision_run='ros2 run vision_ai treatment_planner'
 alias kuka_udp_server='ros2 run udp_listener udp_listener'
 alias kuka_go_landmark='ros2 topic pub --once /command_topic std_msgs/msg/String "data: '\''go_face_landmark'\''" --qos-reliability reliable'
 
-
-
 # Audio System Nodes
-alias run_audio_input="ros2 run kuka_assistant audio_input_node --ros-args --params-file $KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file $KUKA_ASSISTANT_CONFIG_DIR/audio_params.yaml"
-alias run_audio_processor="ros2 run kuka_assistant audio_processor_node --ros-args --params-file $KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file $KUKA_ASSISTANT_CONFIG_DIR/audio_params.yaml"
+alias run_audio_input="ros2 run kuka_assistant audio_input_node --ros-args --params-file \$KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file \$KUKA_ASSISTANT_CONFIG_DIR/audio_params.yaml"
+alias run_audio_processor="ros2 run kuka_assistant audio_processor_node --ros-args --params-file \$KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file \$KUKA_ASSISTANT_CONFIG_DIR/audio_params.yaml"
 
 # Core System Nodes
-alias run_session_manager="ros2 run kuka_assistant session_manager_node --ros-args --params-file $KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file $KUKA_ASSISTANT_CONFIG_DIR/session_manager_params.yaml"
-alias run_speech_detector="ros2 run kuka_assistant speech_event_detector_node --ros-args --params-file $KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file $KUKA_ASSISTANT_CONFIG_DIR/audio_params.yaml"
+alias run_session_manager="ros2 run kuka_assistant session_manager_node --ros-args --params-file \$KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file \$KUKA_ASSISTANT_CONFIG_DIR/session_manager_params.yaml"
+alias run_speech_detector="ros2 run kuka_assistant speech_event_detector_node --ros-args --params-file \$KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file \$KUKA_ASSISTANT_CONFIG_DIR/audio_params.yaml"
 alias run_conversation="ros2 run kuka_assistant conversation_manager_node"
 
 # Processing Nodes
-alias run_transcriber="ros2 run kuka_assistant voice_transcriber_node --ros-args --params-file $KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file $KUKA_ASSISTANT_CONFIG_DIR/voice_transcriber_params.yaml"
-alias run_interpreter="ros2 run kuka_assistant text_interpreter_node --ros-args --params-file $KUKA_ASSISTANT_CONFIG_DIR/text_interpreter_params.yaml"\
-alias run_tts="ros2 run kuka_assistant text_to_speech_node --ros-args --params-file $KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file $KUKA_ASSISTANT_CONFIG_DIR/text_to_speech_params.yaml"
+alias run_transcriber="ros2 run kuka_assistant voice_transcriber_node --ros-args --params-file \$KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file \$KUKA_ASSISTANT_CONFIG_DIR/voice_transcriber_params.yaml"
+alias run_interpreter="ros2 run kuka_assistant text_interpreter_node --ros-args --params-file \$KUKA_ASSISTANT_CONFIG_DIR/text_interpreter_params.yaml"
+alias run_tts="ros2 run kuka_assistant text_to_speech_node --ros-args --params-file \$KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file \$KUKA_ASSISTANT_CONFIG_DIR/text_to_speech_params.yaml"
 
 # Monitoring
-alias run_monitor="ros2 run kuka_assistant monitoring_node --ros-args --params-file $KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file $KUKA_ASSISTANT_CONFIG_DIR/monitoring_params.yaml"
+alias run_monitor="ros2 run kuka_assistant monitoring_node --ros-args --params-file \$KUKA_ASSISTANT_CONFIG_DIR/base_params.yaml --params-file \$KUKA_ASSISTANT_CONFIG_DIR/monitoring_params.yaml" 

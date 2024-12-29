@@ -16,6 +16,31 @@ if [ -f "/root/workspace/ws_startup/install/local_setup.bash" ]; then
     source "/root/workspace/ws_startup/install/local_setup.bash"
 fi
 
+# Setup Hugging Face authentication
+echo "Setting up Hugging Face authentication..."
+if [ -z "${HF_TOKEN}" ]; then
+    echo "WARNING: HF_TOKEN not found in environment!"
+    echo "Please set the environment variable before running."
+    exit 1
+fi
+
+# Install huggingface_hub CLI if not present
+if ! command -v huggingface-cli &> /dev/null; then
+    echo "Installing Hugging Face CLI..."
+    pip install --quiet huggingface_hub
+fi
+
+# Login using the CLI tool with the --token option
+echo "Logging in to Hugging Face..."
+huggingface-cli login --token $HF_TOKEN
+
+# Verify login was successful
+if ! huggingface-cli whoami &> /dev/null; then
+    echo "ERROR: Failed to authenticate with Hugging Face!"
+fi
+
+echo "Hugging Face authentication completed successfully"
+
 # Verify ROS2 installation and environment
 if ! which ros2 &>/dev/null; then
     echo "Error: ROS 2 CLI not found"
@@ -37,9 +62,6 @@ echo "---------------------"
 echo "Available ZED packages:"
 ros2 pkg list | grep zed || echo "No ZED packages found!"
 echo "---------------------"
-
-# Change to workspace directory
-cd /root/workspace
 
 # Execute passed command
 exec "$@"
