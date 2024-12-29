@@ -105,10 +105,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-rviz-visual-tools \
     ros-${ROS_DISTRO}-xacro \
     ros-dev-tools \
-    && rm -rf /var/lib/apt/lists/*
-
-# Initialize rosdep
-RUN rosdep init && rosdep update
+    && rm -rf /var/lib/apt/lists/* \
+    && rosdep init \
+    && rosdep update
 
 # Install ZED SDK
 RUN echo "CUDA Version $CUDA_VERSION" > /usr/local/cuda/version.txt && \
@@ -191,7 +190,8 @@ RUN python3 -m venv /opt/venv && \
         faster-whisper \
         transformers \
         elevenlabs \
-        'accelerate>=0.26.0'
+        'accelerate>=0.26.0' \
+    && rm -rf /root/.cache/pip
         
 
 # Setup shell environment
