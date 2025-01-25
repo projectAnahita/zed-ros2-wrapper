@@ -3,6 +3,7 @@
 # Default values
 DEFAULT_IMAGE_NAME="zed_ros2_desktop_image"
 DEFAULT_TAG="latestplus"
+DETACH="false"
 
 # Help function
 show_help() {
@@ -14,11 +15,13 @@ show_help() {
     echo "  -h, --help              Show this help message"
     echo "  -i, --image NAME        Specify Docker image name (default: $DEFAULT_IMAGE_NAME)"
     echo "  -t, --tag TAG           Specify Docker image tag (default: $DEFAULT_TAG)"
+    echo "  -d, --detach           Run container in background (default: false)"
     echo
     echo "Examples:"
     echo "  $0 --image custom_image --tag latest"
     echo "  $0 -i my_image -t dev"
-    echo "  $0 # Uses defaults"
+    echo "  $0 -d  # Run in background"
+    echo "  $0     # Run in foreground"
 }
 
 # Parse command line arguments
@@ -36,6 +39,10 @@ while [[ $# -gt 0 ]]; do
             DEFAULT_TAG="$2"
             shift 2
             ;;
+        -d|--detach)
+            DETACH="true"
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
             show_help
@@ -43,6 +50,12 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Set detach flag
+DOCKER_FLAGS="-it"  # Always interactive
+if [ "$DETACH" = "true" ]; then
+    DOCKER_FLAGS="$DOCKER_FLAGS -d"
+fi
 
 xhost +local:docker
 
@@ -60,12 +73,11 @@ fi
 mkdir -p $HOME/.cache/huggingface
 
 # Docker run command
-docker run --network host --gpus all --runtime nvidia -it --privileged --ipc=host --pid=host \
+docker run --network host --gpus all --runtime nvidia $DOCKER_FLAGS --privileged --ipc=host --pid=host \
   --env-file $HOME/vars.env \
   -e NVIDIA_DRIVER_CAPABILITIES=all \
   -e DISPLAY=$DISPLAY \
   -e HF_TOKEN=$HF_TOKEN \
-  -e TRANSFORMERS_CACHE=/root/.cache/huggingface \
   -e HF_HOME=/root/.cache/huggingface \
   -v /dev:/dev \
   -v /tmp/.X11-unix/:/tmp/.X11-unix:rw \
@@ -86,27 +98,9 @@ docker run --network host --gpus all --runtime nvidia -it --privileged --ipc=hos
   -e ROS_DOMAIN_ID=0 \
   ${DEFAULT_IMAGE_NAME}:${DEFAULT_TAG}
 
-# Cleanup Hugging Face (will run even if docker exits with error)
-echo "Cleaning up Hugging Face authentication..."
-if command -v huggingface-cli &> /dev/null; then
-    huggingface-cli logout || true  # Continue even if logout fails
+# Run cleanup for non-detached mode
+if [ "$DETACH" = "false" ]; then
+    ./cleanup_docker.sh
+else
+    echo "Container started in detached mode. Run ./cleanup_docker.sh when you want to clean up."
 fi
-
-# Cleanup audio (will run even if docker exits with error)
-./audio_control.sh cleanup
-
-# Change ownership and permissions of the zed_docker_ai directory after exiting the container
-if [ -d "$HOME/zed_docker_ai" ]; then
-    echo "Changing ownership and permissions of the zed_docker_ai directory..."
-    sudo chown -R $USER:$USER $HOME/zed_docker_ai/
-    chmod -R ugo+rw $HOME/zed_docker_ai/
-fi
-
-# Change ownership of the workspace directory if it exists
-if [ -d "$HOME/Desktop/workspace" ]; then
-    echo "Changing ownership of the workspace directory..."
-    sudo chown -R $USER:$USER $HOME/Desktop/workspace
-fi
-
-# Revoke access to the X server
-xhost -local:docker
