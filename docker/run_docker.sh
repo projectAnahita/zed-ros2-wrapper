@@ -2,8 +2,8 @@
 
 # Default values
 DEFAULT_IMAGE_NAME="zed_ros2_desktop_image"
-DEFAULT_TAG="latestplus"
-DETACH="false"
+DEFAULT_TAG="latestppp"
+DETACH="true"
 
 # Help function
 show_help() {
@@ -15,7 +15,7 @@ show_help() {
     echo "  -h, --help              Show this help message"
     echo "  -i, --image NAME        Specify Docker image name (default: $DEFAULT_IMAGE_NAME)"
     echo "  -t, --tag TAG           Specify Docker image tag (default: $DEFAULT_TAG)"
-    echo "  -d, --detach           Run container in background (default: false)"
+    echo "  -d, --detach           Run container in background (default: $DETACH)"
     echo
     echo "Examples:"
     echo "  $0 --image custom_image --tag latest"

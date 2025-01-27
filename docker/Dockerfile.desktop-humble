@@ -191,6 +191,8 @@ RUN python3 -m venv /opt/venv && \
         transformers \
         elevenlabs \
         'accelerate>=0.26.0' \
+        'spacy==3.8.4' \
+    && python -m spacy download en_core_web_lg \
     && rm -rf /root/.cache/pip
         
 
