@@ -1,0 +1,36 @@
+# Use the base image that already has ROS2 Humble on L4T 35.3.1
+FROM dustynv/ros:humble-ros-base-l4t-r35.3.1
+
+# Environment variables for ZED SDK
+ARG ZED_SDK_MAJOR=4
+ARG ZED_SDK_MINOR=2
+ARG ZED_SDK_PATCH=5
+ARG ZED_SDK_URL="https://stereolabs.sfo2.cdn.digitaloceanspaces.com/zedsdk/${ZED_SDK_MAJOR}.${ZED_SDK_MINOR}/ZED_SDK_Tegra_L4T35.3_v${ZED_SDK_MAJOR}.${ZED_SDK_MINOR}.${ZED_SDK_PATCH}.zstd.run"
+
+# Disable interactive prompts during installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install required packages including zstd
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    build-essential \
+    zstd && \
+    rm -rf /var/lib/apt/lists/*
+
+# Check if the ZED SDK URL is valid and install it
+RUN if [ "$(curl -I "${ZED_SDK_URL}" -o /dev/null -s -w '%{http_code}\n' | head -n 1)" = "200" ]; then \
+        echo "ZED SDK URL is valid."; \
+        wget -q --no-check-certificate -O ZED_SDK_Linux_JP.run "${ZED_SDK_URL}" && \
+        chmod +x ZED_SDK_Linux_JP.run && \
+        ./ZED_SDK_Linux_JP.run silent && \
+        rm -rf ZED_SDK_Linux_JP.run; \
+    else \
+        echo "ZED SDK URL is invalid or the file does not exist."; \
+        exit 1; \
+    fi
+
+# Set up the entrypoint for the container
+CMD ["bash"]
+
