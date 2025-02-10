@@ -6,7 +6,7 @@ DIAGNOSTICS_VERSION=3.0.0
 AMENT_LINT_VERSION=0.12.4
 GEOGRAPHIC_INFO_VERSION=1.0.4
 ROBOT_LOCALIZATION_VERSION=3.4.2
-DRACO_VERSION=1.5.5
+DRACO_VERSION=1.5.7
 
 # Function to clean workspace
 clean_workspace() {
@@ -55,8 +55,8 @@ cd /
 rm -rf /tmp/draco
 
 # Create workspace
-mkdir -p ~/ros2_ws/src
-cd ~/ros2_ws
+mkdir -p /root/ws_startup/ws_zed/src
+cd /root/ws_startup/ws_zed
 
 # Clean the workspace BEFORE cloning repositories
 clean_workspace
@@ -88,38 +88,40 @@ rm -rf geographic-info
 git clone https://github.com/ros-drivers/nmea_msgs.git --branch ros2
 git clone https://github.com/ros/angles.git --branch humble-devel
 
-# Build ONLY Draco and its dependencies
-cd ~/ros2_ws
+cd ..  # Back to workspace root
+
+# Build workspace in stages
 source /opt/ros/humble/setup.bash || true
-echo "Building rcpputils, point_cloud_transport, and draco_point_cloud_transport..."
-colcon build --symlink-install \
-    --cmake-args " -DCMAKE_BUILD_TYPE=Release" \
-    " -DCMAKE_LIBRARY_PATH=/usr/lib:/usr/local/lib:/usr/lib/aarch64-linux-gnu" \
-    --packages-up-to draco_point_cloud_transport
 
-# Source the workspace
-source install/setup.bash
+# # Build point cloud related packages first
+# echo "Building point cloud related packages..."
+# colcon build --symlink-install \
+#     --cmake-args " -DCMAKE_BUILD_TYPE=Release" \
+#     " -DCMAKE_LIBRARY_PATH=/usr/lib:/usr/local/lib:/usr/lib/aarch64-linux-gnu" \
+#     --packages-up-to rcpputils point_cloud_transport draco_point_cloud_transport && \
+# source install/setup.bash
 
-# Build the complete workspace, with CMAKE_PREFIX_PATH
+# Build the complete workspace
 echo "Building the complete workspace..."
+# colcon build --parallel-workers $(nproc) --symlink-install \
+#     --event-handlers console_direct+ --base-paths src \
+#     --cmake-args " -DCMAKE_BUILD_TYPE=Release" \
+#     " -DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:/usr/lib:/usr/local/lib:/usr/lib/aarch64-linux-gnu" \
+#     " -DCMAKE_CXX_FLAGS='-Wl,--allow-shlib-undefined -Wl,-rpath,/usr/lib:/usr/local/lib:/usr/lib/aarch64-linux-gnu'" \
+#     " -DCMAKE_PREFIX_PATH=$(pwd)/install:/usr/" \
+#     " --no-warn-unused-cli"
 colcon build --parallel-workers $(nproc) --symlink-install \
     --event-handlers console_direct+ --base-paths src \
     --cmake-args " -DCMAKE_BUILD_TYPE=Release" \
-    " -DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:/usr/lib:/usr/local/lib:/usr/lib/aarch64-linux-gnu" \
-    " -DCMAKE_CXX_FLAGS='-Wl,--allow-shlib-undefined -Wl,-rpath,/usr/lib:/usr/local/lib:/usr/lib/aarch64-linux-gnu'" \
-    " -DCMAKE_PREFIX_PATH=$(pwd)/install:/usr/" \
+    " -DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs" \
+    " -DCMAKE_CXX_FLAGS='-Wl,--allow-shlib-undefined'" \
     " --no-warn-unused-cli"
+source install/setup.bash
 
 # Add sourcing to .bashrc
-if ! grep -q "source \$(pwd)/install/local_setup.bash" ~/.bashrc; then
+if ! grep -q "source /root/ws_startup/ws_zed/install/local_setup.bash" ~/.bashrc; then
     echo "Adding workspace sourcing to ~/.bashrc..."
-    echo "source $(pwd)/install/local_setup.bash" >> ~/.bashrc
-fi
-
-# Add Draco library path to LD_LIBRARY_PATH in .bashrc if not already present
-if ! grep -q "export LD_LIBRARY_PATH=/usr/lib:\$LD_LIBRARY_PATH" ~/.bashrc; then
-    echo "Adding Draco library path to LD_LIBRARY_PATH in ~/.bashrc..."
-    echo "export LD_LIBRARY_PATH=/usr/lib:/usr/local/lib:/usr/lib/aarch64-linux-gnu:\$LD_LIBRARY_PATH" >> ~/.bashrc
+    echo "source /root/ws_startup/ws_zed/install/local_setup.bash" >> ~/.bashrc
 fi
 
 echo "Installation complete! The ZED ROS2 Wrapper is now ready."
