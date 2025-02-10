@@ -10,11 +10,9 @@ source /opt/venv/bin/activate
 source /opt/ros/${ROS_DISTRO}/setup.bash
 
 # Source workspaces if they exist
-for ws in "ws_zed" "ws_startup"; do
-    if [ -f "/root/workspace/${ws}/install/local_setup.bash" ]; then
-        source "/root/workspace/${ws}/install/local_setup.bash"
-    fi
-done
+if [ -f "/root/ws_startup/ws_zed/install/local_setup.bash" ]; then
+    source "/root/ws_startup/ws_zed/install/local_setup.bash"
+fi
 
 # Setup command completion
 eval "$(register-python-argcomplete3 ros2)"
