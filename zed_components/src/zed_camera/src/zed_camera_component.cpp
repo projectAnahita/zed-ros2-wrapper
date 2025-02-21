@@ -87,7 +87,8 @@ ZedCamera::ZedCamera(const rclcpp::NodeOptions & options)
   mPrevTs_pc(TIMEZERO_ROS),
   mLastClock(TIMEZERO_ROS),
   mStreamingServerRequired(false),
-  mStreamingServerRunning(false)
+  mStreamingServerRunning(false),
+  mUptimer(get_clock())
 {
   RCLCPP_INFO(get_logger(), "********************************");
   RCLCPP_INFO(get_logger(), "      ZED Camera Component ");
@@ -803,6 +804,18 @@ void ZedCamera::getGeneralParams()
       " * Camera framerate: ");
   }
   getParam("general.gpu_id", mGpuId, mGpuId, " * GPU ID: ");
+  getParam("general.async_image_retrieval", mAsyncImageRetrieval, mAsyncImageRetrieval);
+  RCLCPP_INFO_STREAM(
+    get_logger(),
+    " * Asynchronous image retrieval: " << (mAsyncImageRetrieval ? "TRUE" : "FALSE"));
+
+#if (ZED_SDK_MAJOR_VERSION >= 5)
+  getParam("general.enable_image_validity_check", mImageValidityCheck, mImageValidityCheck);
+  RCLCPP_INFO_STREAM(
+    get_logger(),
+    " * Image Validity Check: " << (mImageValidityCheck == 1 ? "ENABLED" : "DISABLED"));
+#endif
+
 
   // TODO(walter) ADD SVO SAVE COMPRESSION PARAMETERS
 
@@ -857,11 +870,11 @@ void ZedCamera::getGeneralParams()
     }
   }
 
-  std::string out_resol = "MEDIUM";
+  std::string out_resol = "NATIVE";
   getParam("general.pub_resolution", out_resol, out_resol);
-  if (out_resol == "NATIVE") {
+  if (out_resol == toString(PubRes::NATIVE)) {
     mPubResolution = PubRes::NATIVE;
-  } else if (out_resol == "CUSTOM") {
+  } else if (out_resol == toString(PubRes::CUSTOM)) {
     mPubResolution = PubRes::CUSTOM;
   } else {
     RCLCPP_WARN(
@@ -869,7 +882,7 @@ void ZedCamera::getGeneralParams()
       "Not valid 'general.pub_resolution' value: '%s'. Using default "
       "setting instead.",
       out_resol.c_str());
-    out_resol = "NATIVE";
+    out_resol = "NATIVE -> Fix the value in YAML!";
     mPubResolution = PubRes::NATIVE;
   }
   RCLCPP_INFO_STREAM(
@@ -1215,6 +1228,29 @@ void ZedCamera::getDepthParams()
     RCLCPP_INFO_STREAM(
       get_logger(),
       " * [DYN] Point cloud rate [Hz]: " << mPcPubRate);
+
+    std::string out_resol = "COMPACT";
+    getParam("depth.point_cloud_res", out_resol, out_resol);
+    if (out_resol == toString(PcRes::PUB)) {
+      mPcResolution = PcRes::PUB;
+    } else if (out_resol == toString(PcRes::FULL)) {
+      mPcResolution = PcRes::FULL;
+    } else if (out_resol == toString(PcRes::COMPACT)) {
+      mPcResolution = PcRes::COMPACT;
+    } else if (out_resol == toString(PcRes::REDUCED)) {
+      mPcResolution = PcRes::REDUCED;
+    } else {
+      RCLCPP_WARN(
+        get_logger(),
+        "Not valid 'depth.point_cloud_res' value: '%s'. Using default "
+        "setting instead.",
+        out_resol.c_str());
+      out_resol = "COMPACT -> Fix the value in YAML!";
+      mPcResolution = PcRes::COMPACT;
+    }
+    RCLCPP_INFO_STREAM(
+      get_logger(),
+      " * Point cloud resolution: " << out_resol.c_str());
 
     getParam(
       "depth.depth_confidence", mDepthConf, mDepthConf,
@@ -1891,7 +1927,7 @@ void ZedCamera::getStreamingServerParams()
     RCLCPP_INFO(get_logger(), " * Stream codec: H264");
   }
 
-  getParam("stream_server.port", mStreamingServerPort, mStreamingServerPort, " * Stream port:");
+  getParam("stream_server.port", mStreamingServerPort, mStreamingServerPort, " * Stream port: ");
 
   getParam("stream_server.bitrate", mStreamingServerBitrate, mStreamingServerBitrate);
   if (mStreamingServerBitrate < 1000) {
@@ -3094,7 +3130,7 @@ void ZedCamera::setTFCoordFrameNames()
   RCLCPP_INFO_STREAM(get_logger(), " * Map\t\t\t-> " << mMapFrameId);
   RCLCPP_INFO_STREAM(get_logger(), " * Odometry\t\t-> " << mOdomFrameId);
   RCLCPP_INFO_STREAM(get_logger(), " * Base\t\t\t-> " << mBaseFrameId);
-  RCLCPP_INFO_STREAM(get_logger(), " * Camera\t\t\t-> " << mCameraFrameId);
+  RCLCPP_INFO_STREAM(get_logger(), " * Camera\t\t-> " << mCameraFrameId);
   RCLCPP_INFO_STREAM(get_logger(), " * Left\t\t\t-> " << mLeftCamFrameId);
   RCLCPP_INFO_STREAM(
     get_logger(),
@@ -3411,7 +3447,45 @@ void ZedCamera::initPublishers()
     mTopicRoot + /*imuTopicRoot + "/" +*/ pressure_topic_name;
   std::string temp_topic_left = mTopicRoot + temp_topic_root + "/left";
   std::string temp_topic_right = mTopicRoot + temp_topic_root + "/right";
+
+#if (ZED_SDK_MAJOR_VERSION >= 5)
+  // Set the Health Status topic names
+  std::string health_topic_root = mTopicRoot + "health_status/";
+  std::string health_low_quality_topic = health_topic_root + "low_image_quality";
+  std::string health_low_lighting_topic = health_topic_root + "low_lighting";
+  std::string health_low_depth_topic = health_topic_root + "low_depth_reliability";
+  std::string health_low_sensor_topic = health_topic_root + "low_motion_sensors_reliability";
+#endif
   // <---- Topics names definition
+
+#if (ZED_SDK_MAJOR_VERSION >= 5)
+  // ----> Health Status publishers
+  mPubHealthImage = create_publisher<std_msgs::msg::Bool>(
+    health_low_quality_topic,
+    mQos, mPubOpt);
+  RCLCPP_INFO_STREAM(
+    get_logger(),
+    "Advertised on topic: " << mPubHealthImage->get_topic_name());
+  mPubHealthLight = create_publisher<std_msgs::msg::Bool>(
+    health_low_lighting_topic,
+    mQos, mPubOpt);
+  RCLCPP_INFO_STREAM(
+    get_logger(),
+    "Advertised on topic: " << mPubHealthLight->get_topic_name());
+  mPubHealthDepth = create_publisher<std_msgs::msg::Bool>(
+    health_low_depth_topic,
+    mQos, mPubOpt);
+  RCLCPP_INFO_STREAM(
+    get_logger(),
+    "Advertised on topic: " << mPubHealthDepth->get_topic_name());
+  mPubHealthSensor = create_publisher<std_msgs::msg::Bool>(
+    health_low_sensor_topic,
+    mQos, mPubOpt);
+  RCLCPP_INFO_STREAM(
+    get_logger(),
+    "Advertised on topic: " << mPubHealthSensor->get_topic_name());
+  // <---- Health Status publishers
+#endif
 
   // ----> Camera publishers
   mPubRgb = image_transport::create_camera_publisher(
@@ -3869,6 +3943,12 @@ bool ZedCamera::startCamera()
     mInitParams.camera_fps = mCamGrabFrameRate;
     mInitParams.grab_compute_capping_fps = static_cast<float>(mPubFrameRate);
     mInitParams.camera_resolution = static_cast<sl::RESOLUTION>(mCamResol);
+    mInitParams.async_image_retrieval = mAsyncImageRetrieval;
+#if (ZED_SDK_MAJOR_VERSION >= 5)
+    mInitParams.enable_image_validity_check = mImageValidityCheck;
+#else
+    mInitParams.enable_image_validity_check = 0;
+#endif
 
     if (mCamSerialNumber > 0) {
       mInitParams.input.setFromSerialNumber(mCamSerialNumber);
@@ -3896,13 +3976,6 @@ bool ZedCamera::startCamera()
   mInitParams.async_grab_camera_recovery =
     true;    // Camera recovery is handled asynchronously to provide information
              // about this status
-
-  // NOTE: this is a temp fix to GMSL2 camera close issues
-  // TODO: check if this issue has been fixed in the SDK
-  if (sl_tools::isZEDX(mCamUserModel)) {
-    RCLCPP_INFO(get_logger(), "Disable async recovery for GMSL2 cameras");
-    mInitParams.async_grab_camera_recovery = false;
-  }
   // <---- ZED configuration
 
   // ----> Try to connect to a camera, to a stream, or to load an SVO
@@ -3918,6 +3991,7 @@ bool ZedCamera::startCamera()
 
     if (mConnStatus == sl::ERROR_CODE::SUCCESS) {
       DEBUG_STREAM_COMM("Opening successfull");
+      mUptimer.tic(); // Sets the beginning of the camera connection time
       break;
     }
 
@@ -4130,30 +4204,45 @@ bool ZedCamera::startCamera()
   mCamHeight = camInfo.camera_configuration.resolution.height;
 
   RCLCPP_INFO_STREAM(
-    get_logger(), " * Camera grab frame size -> "
+    get_logger(), " * Camera grab size -> "
       << mCamWidth << "x" << mCamHeight);
 
-  int pub_w, pub_h;
-  pub_w = static_cast<int>(std::round(mCamWidth / mCustomDownscaleFactor));
-  pub_h = static_cast<int>(std::round(mCamHeight / mCustomDownscaleFactor));
-
-  if (pub_w > mCamWidth || pub_h > mCamHeight) {
-    RCLCPP_WARN_STREAM(
-      get_logger(), "The publishing resolution ("
-        << pub_w << "x" << pub_h
-        << ") cannot be higher than the grabbing resolution ("
-        << mCamWidth << "x" << mCamHeight
-        << "). Using grab resolution for output messages.");
-    pub_w = mCamWidth;
-    pub_h = mCamHeight;
-  }
-
+  int pub_w = static_cast<int>(std::round(mCamWidth / mCustomDownscaleFactor));
+  int pub_h = static_cast<int>(std::round(mCamHeight / mCustomDownscaleFactor));
   mMatResol = sl::Resolution(pub_w, pub_h);
+
   RCLCPP_INFO_STREAM(
-    get_logger(), " * Publishing frame size  -> "
-      << mMatResol.width << "x"
-      << mMatResol.height);
+    get_logger(), " * Color/Depth publishing size -> "
+      << mMatResol.width << "x" << mMatResol.height);
   // <---- Camera information
+
+  // ----> Point Cloud resolution
+  int pc_w = 0, pc_h = 0;
+  switch (mPcResolution) {
+    case PcRes::PUB: // Same as image and depth map
+      pc_w = pub_w;
+      pc_h = pub_h;
+      break;
+    case PcRes::FULL:
+      pc_w = NEURAL_W;
+      pc_h = NEURAL_H;
+      break;
+    case PcRes::COMPACT:
+      pc_w = NEURAL_W / 2;
+      pc_h = NEURAL_H / 2;
+      break;
+    case PcRes::REDUCED:
+      pc_w = NEURAL_W / 4;
+      pc_h = NEURAL_H / 4;
+      break;
+  }
+  mPcResol = sl::Resolution(pc_w, pc_h);
+
+  RCLCPP_INFO_STREAM(
+    get_logger(), " * Point Cloud publishing size -> "
+      << mPcResol.width << "x" << mPcResol.height);
+  // <---- Point Cloud resolution1
+
 
   // ----> Set Region of Interest
   if (!mDepthDisabled) {
@@ -4786,9 +4875,6 @@ bool ZedCamera::startPosTracking()
       mInitialBasePose[0], mInitialBasePose[1], mInitialBasePose[2],
       mInitialBasePose[3], mInitialBasePose[4], mInitialBasePose[5]);
 
-    // elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-    //   std::chrono::high_resolution_clock::now() - start)
-    //   .count();
     elapsed = stopWatch.toc();
 
     rclcpp::sleep_for(1ms);
@@ -6001,7 +6087,18 @@ void ZedCamera::threadFunc_zedGrab()
                 << sl::toString(mGrabStatus).c_str() << ". Trying to recover the connection...");
             rclcpp::sleep_for(1000ms);
             continue;
-          } else {
+          }
+#if (ZED_SDK_MAJOR_VERSION >= 5)
+          else if (mGrabStatus == sl::ERROR_CODE::CORRUPTED_FRAME) {
+            RCLCPP_WARN_STREAM(
+              get_logger(),
+              "Corrupted frame detected: "
+                << sl::toString(mGrabStatus).c_str());
+            static const int frame_grab_period =
+              static_cast<int>(std::round(1000. / mCamGrabFrameRate));
+          }
+#endif
+          else {
             RCLCPP_ERROR_STREAM(
               get_logger(),
               "Critical camera error: " << sl::toString(mGrabStatus).c_str()
@@ -6078,6 +6175,10 @@ void ZedCamera::threadFunc_zedGrab()
           }
         }
 
+#if (ZED_SDK_MAJOR_VERSION >= 5)
+        publishHealthStatus();
+#endif
+
         // ----> Check recording status
         mRecMutex.lock();
         if (mRecording) {
@@ -6142,15 +6243,21 @@ void ZedCamera::threadFunc_zedGrab()
           std::unique_lock<std::mutex> pc_lock(mPcMutex, std::defer_lock);
 
           if (pc_lock.try_lock()) {
-            DEBUG_STREAM_PC("Retrieving point cloud");
+            DEBUG_STREAM_PC(
+              "Retrieving point cloud size: " << mPcResol.width << "x" << mPcResol.height);
             mZed->retrieveMeasure(
               mMatCloud, sl::MEASURE::XYZBGRA, sl::MEM::CPU,
-              mMatResol);
+              mPcResol);
+            DEBUG_STREAM_PC(
+              "Retrieved point cloud size: " << mMatCloud.getWidth() << "x" <<
+                mMatCloud.getHeight());
 
             // Signal Pointcloud thread that a new pointcloud is ready
             mPcDataReadyCondVar.notify_one();
             mPcDataReady = true;
             mPcPublishing = true;
+
+            DEBUG_STREAM_PC("Extracted point cloud: " << mMatCloud.getInfos().c_str() );
           }
         } else {
           mPcPublishing = false;
@@ -6213,7 +6320,7 @@ void ZedCamera::threadFunc_zedGrab()
 
 bool ZedCamera::publishSensorsData(rclcpp::Time force_ts)
 {
-  if (mGrabStatus != sl::ERROR_CODE::SUCCESS) {
+  if (mGrabStatus != sl::ERROR_CODE::SUCCESS && mGrabStatus != sl::ERROR_CODE::CORRUPTED_FRAME) {
     DEBUG_SENS("Camera not ready");
     rclcpp::sleep_for(1s);
     return false;
@@ -7095,8 +7202,9 @@ void ZedCamera::retrieveVideoDepth()
       mZed->retrieveMeasure(
       mMatDepth, sl::MEASURE::DEPTH,
       sl::MEM::CPU, mMatResol);
+
     mSdkGrabTS = mMatDepth.timestamp;
-    DEBUG_VD("Depth map retrieved");
+    DEBUG_STREAM_VD("Depth map retrieved: " << mMatDepth.getInfos().c_str());
   }
   if (mDisparitySubCount > 0) {
     DEBUG_STREAM_VD("Retrieving Disparity");
@@ -9069,8 +9177,8 @@ void ZedCamera::publishPointCloud()
   // Initialize Point Cloud message
   // https://github.com/ros/common_msgs/blob/jade-devel/sensor_msgs/include/sensor_msgs/point_cloud2_iterator.h
 
-  int width = mMatResol.width;
-  int height = mMatResol.height;
+  int width = mPcResol.width;
+  int height = mPcResol.height;
 
   int ptsCount = width * height;
 
@@ -9158,7 +9266,7 @@ void ZedCamera::callback_pubTemp()
 {
   DEBUG_STREAM_ONCE_SENS("Temperatures callback called");
 
-  if (mGrabStatus != sl::ERROR_CODE::SUCCESS) {
+  if (mGrabStatus != sl::ERROR_CODE::SUCCESS && mGrabStatus != sl::ERROR_CODE::CORRUPTED_FRAME) {
     DEBUG_SENS("Camera not ready");
     rclcpp::sleep_for(1s);
     return;
@@ -9987,7 +10095,9 @@ void ZedCamera::callback_updateDiagnostic(
     return;
   }
 
-  if (mGrabStatus == sl::ERROR_CODE::SUCCESS) {
+  stat.addf("Uptime", "%s", sl_tools::seconds2str(mUptimer.toc()).c_str());
+
+  if (mGrabStatus == sl::ERROR_CODE::SUCCESS || mGrabStatus == sl::ERROR_CODE::CORRUPTED_FRAME) {
     double freq = 1. / mGrabPeriodMean_sec->getAvg();
     double freq_perc = 100. * freq / mPubFrameRate;
     stat.addf("Capture", "Mean Frequency: %.1f Hz (%.1f%%)", freq, freq_perc);
@@ -9998,6 +10108,7 @@ void ZedCamera::callback_updateDiagnostic(
     stat.addf(
       "Capture", "Tot. Processing Time: %.6f sec (Max. %.3f sec)",
       frame_proc_sec, frame_grab_period);
+
 
     if (frame_proc_sec > frame_grab_period) {
       mSysOverloadCount++;
@@ -10014,6 +10125,15 @@ void ZedCamera::callback_updateDiagnostic(
         diagnostic_msgs::msg::DiagnosticStatus::OK,
         "Camera grabbing");
     }
+
+    // ----> Frame drop count
+    auto dropped = mZed->getFrameDroppedCount();
+    uint64_t total = dropped + mFrameCount;
+    auto perc_drop = 100. * static_cast<double>(dropped) / total;
+    stat.addf(
+      "Frame Drop rate", "%u/%lu (%g%%)",
+      dropped, total, perc_drop);
+    // <---- Frame drop count
 
     if (mSimMode) {
       stat.add("Input mode", "SIMULATION");
@@ -10176,6 +10296,12 @@ void ZedCamera::callback_updateDiagnostic(
       stat.addf("TF IMU", "Mean Frequency: %.1f Hz", freq);
     } else {
       stat.add("TF IMU", "DISABLED");
+    }
+
+    if (mGrabStatus == sl::ERROR_CODE::CORRUPTED_FRAME) {
+      stat.summary(
+        diagnostic_msgs::msg::DiagnosticStatus::WARN,
+        "Performance Degraded - Corrupted frame received");
     }
   } else if (mGrabStatus == sl::ERROR_CODE::LAST) {
     stat.summary(
@@ -11229,6 +11355,58 @@ void ZedCamera::stopStreamingServer()
   mStreamingServerRunning = false;
   mStreamingServerRequired = false;
 }
+
+#if (ZED_SDK_MAJOR_VERSION >= 5)
+void ZedCamera::publishHealthStatus()
+{
+  if (mImageValidityCheck > 0) {
+    size_t img_sub = 0;
+    size_t light_sub = 0;
+    size_t depth_sub = 0;
+    size_t sensor_sub = 0;
+    try {
+      img_sub = mPubHealthImage->get_subscription_count();
+      light_sub = mPubHealthLight->get_subscription_count();
+      depth_sub = mPubHealthDepth->get_subscription_count();
+      sensor_sub = mPubHealthSensor->get_subscription_count();
+    } catch (...) {
+      rcutils_reset_error();
+      DEBUG_STREAM_VD("publishHealthStatus: Exception while counting subscribers");
+      return;
+    }
+
+    if (img_sub + light_sub + depth_sub + sensor_sub == 0) {
+      return;
+    }
+
+    sl::HealthStatus status = mZed->getHealthStatus();
+
+    if (img_sub > 0) {
+      auto msg = std::make_unique<std_msgs::msg::Bool>();
+      msg->data = status.low_image_quality;
+      mPubHealthImage->publish(std::move(msg));
+    }
+
+    if (light_sub > 0) {
+      auto msg = std::make_unique<std_msgs::msg::Bool>();
+      msg->data = status.low_lighting;
+      mPubHealthLight->publish(std::move(msg));
+    }
+
+    if (depth_sub > 0) {
+      auto msg = std::make_unique<std_msgs::msg::Bool>();
+      msg->data = status.low_depth_reliability;
+      mPubHealthDepth->publish(std::move(msg));
+    }
+
+    if (sensor_sub > 0) {
+      auto msg = std::make_unique<std_msgs::msg::Bool>();
+      msg->data = status.low_motion_sensors_reliability;
+      mPubHealthSensor->publish(std::move(msg));
+    }
+  }
+}
+#endif
 }  // namespace stereolabs
 
 #include "rclcpp_components/register_node_macro.hpp"
