@@ -91,7 +91,7 @@ git clone https://github.com/ros/angles.git --branch humble-devel
 cd ..  # Back to workspace root
 
 # Build workspace in stages
-source /opt/ros/humble/setup.bash || true
+source /opt/ros/humble/install/setup.bash || true
 
 # # Build point cloud related packages first
 # echo "Building point cloud related packages..."

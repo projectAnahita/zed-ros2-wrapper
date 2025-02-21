@@ -36,6 +36,8 @@ alias run_manager="ros2 run kuka_assistant conversation_manager_node --ros-args 
 alias run_ollama="ros2 run kuka_assistant ollama_service_node --ros-args --params-file \$KA_CONFIG_PATH"
 alias run_transcriber_stream="ros2 run kuka_assistant voice_transcriber_stream_node --ros-args --params-file \$KA_CONFIG_PATH"
 alias run_elevenlabs_tts_ws="ros2 run kuka_assistant elevenlabs_tts_ws_node --ros-args --params-file \$KA_CONFIG_PATH"
+alias run_demo="ros2 run kuka_assistant demo_node --ros-args --params-file \$KA_CONFIG_PATH"
+alias run_web_gui="ros2 run gui_pro web_gui_node --ros-args --params-file \$KA_CONFIG_PATH"
 
 alias run_zed_camera='ros2 launch zed_cam zed_subscriber'
 alias run_zed_wrapper='ros2 launch zed_wrapper zed_wrapper.launch.py camera_model:=zedxm'

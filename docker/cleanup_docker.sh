@@ -8,16 +8,19 @@ fi
 # Cleanup audio
 ./audio_control.sh cleanup
 
-# Change ownership and permissions
-if [ -d "$HOME/zed_docker_ai" ]; then
-    echo "Changing ownership and permissions of the zed_docker_ai directory..."
-    sudo chown -R $USER:$USER $HOME/zed_docker_ai/
-    chmod -R ugo+rw $HOME/zed_docker_ai/
-fi
-
+# Change ownership of all mounted volumes back to host user
+echo "Changing ownership of workspace directories..."
 if [ -d "$HOME/Desktop/workspace" ]; then
-    echo "Changing ownership of the workspace directory..."
+    echo "Fixing permissions for workspace directory..."
     sudo chown -R $USER:$USER $HOME/Desktop/workspace
 fi
 
-xhost -local:docker 
+if [ -d "$HOME/.cache/huggingface" ]; then
+    echo "Fixing permissions for Hugging Face cache..."
+    sudo chown -R $USER:$USER $HOME/.cache/huggingface
+fi
+
+# Revoke Docker X11 access
+xhost -local:docker
+
+echo "Cleanup completed!" 

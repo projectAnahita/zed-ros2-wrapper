@@ -3,9 +3,6 @@ ARG UBUNTU_MINOR=04
 ARG CUDA_MAJOR=12
 ARG CUDA_MINOR=1
 ARG CUDA_PATCH=0
-ARG ZED_SDK_MAJOR=4
-ARG ZED_SDK_MINOR=1
-ARG ZED_SDK_PATCH=4
 
 ARG IMAGE_NAME=nvcr.io/nvidia/cuda:${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}-devel-ubuntu${UBUNTU_MAJOR}.${UBUNTU_MINOR}
 
@@ -17,9 +14,6 @@ ARG UBUNTU_MINOR
 ARG CUDA_MAJOR
 ARG CUDA_MINOR
 ARG CUDA_PATCH
-ARG ZED_SDK_MAJOR
-ARG ZED_SDK_MINOR
-ARG ZED_SDK_PATCH
 ARG ROS2_DIST=humble
 
 # Environment setup
@@ -27,10 +21,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Los_Angeles
 ENV ROS_DISTRO=${ROS2_DIST}
 ENV NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:+$NVIDIA_DRIVER_CAPABILITIES,}compute,video,utility
-ENV ZED_SDK_URL="https://stereolabs.sfo2.cdn.digitaloceanspaces.com/zedsdk/${ZED_SDK_MAJOR}.${ZED_SDK_MINOR}/ZED_SDK_Ubuntu${UBUNTU_MAJOR}_cuda${CUDA_MAJOR}.${CUDA_MINOR}_v${ZED_SDK_MAJOR}.${ZED_SDK_MINOR}.${ZED_SDK_PATCH}.zstd.run"
 
-# Install system dependencies
+# Install all system dependencies, ROS2 repository, and packages in one layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    # System dependencies
     apt-utils \
     bash-completion \
     build-essential \
@@ -57,6 +51,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     usbutils \
     wget \
     zstd \
+    # Node.js dependencies
+    ca-certificates \
+    gnupg \
     # Audio dependencies
     alsa-utils \
     ffmpeg \
@@ -67,24 +64,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && locale-gen en_US en_US.UTF-8 \
     && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
-    && rm -rf /var/lib/apt/lists/* \
+    # Setup Node.js repository
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+    # Install CUDA keyring and cuDNN
     && wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
     && dpkg -i cuda-keyring_1.1-1_all.deb \
-    && apt-get update \
-    && apt-get install -y cudnn-cuda-12 \
     && rm -f cuda-keyring_1.1-1_all.deb \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set up ROS2 repository
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
+    # After adding new repositories, update and install additional packages
+    && apt-get update \
+    && apt-get install -y nodejs cudnn-cuda-12 \
+    # Set up ROS2 repository
     && add-apt-repository universe \
     && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install ROS2 packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
+    # After adding ROS2 repository, update and install ROS2 packages
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-ros-base \
     ros-${ROS_DISTRO}-ament-cmake-auto \
     ros-${ROS_DISTRO}-ament-cmake-clang-format \
@@ -105,33 +102,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-rviz-visual-tools \
     ros-${ROS_DISTRO}-xacro \
     ros-dev-tools \
-    && rm -rf /var/lib/apt/lists/* \
     && rosdep init \
-    && rosdep update
+    && rosdep update \
+    # Clean up
+    && rm -rf /var/lib/apt/lists/*
 
-# Install ZED SDK
-RUN echo "CUDA Version $CUDA_VERSION" > /usr/local/cuda/version.txt && \
-    wget -q -O ZED_SDK_Linux_Ubuntu.run ${ZED_SDK_URL} && \
-    chmod +x ZED_SDK_Linux_Ubuntu.run && \
-    ./ZED_SDK_Linux_Ubuntu.run -- silent skip_tools skip_cuda && \
-    ln -sf /lib/x86_64-linux-gnu/libusb-1.0.so.0 /usr/lib/x86_64-linux-gnu/libusb-1.0.so && \
-    rm ZED_SDK_Linux_Ubuntu.run
-
-# Build the ROS2 Wrapper
-WORKDIR /root/workspace/ws_zed/src
-COPY tmp_sources/ ./
-
-WORKDIR /root/workspace/ws_zed
-RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
-    apt-get update -y || true && \
-    rosdep update && \
-    rosdep install --from-paths src --ignore-src -r -y && \
-    rm -rf /var/lib/apt/lists/* && \
-    colcon build --parallel-workers $(nproc) --symlink-install \
-        --event-handlers console_direct+ --base-paths src \
-        --cmake-args ' -DCMAKE_BUILD_TYPE=Release' \
-        ' -DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs' \
-        ' -DCMAKE_CXX_FLAGS="-Wl,--allow-shlib-undefined"'
+# Stay as root for consistent ownership
+WORKDIR /root/workspace/ws_startup/artifex
 
 # Set up Python virtual environment and install packages
 RUN python3 -m venv /opt/venv && \
@@ -194,17 +171,16 @@ RUN python3 -m venv /opt/venv && \
         'spacy==3.8.4' \
     && python -m spacy download en_core_web_lg \
     && rm -rf /root/.cache/pip
-        
 
 # Setup shell environment
 COPY .bashrc /root/.bashrc
 COPY .bash_aliases /root/.bash_aliases
 
 # Set final working directory
-WORKDIR /root/workspace/ws_startup/artifex
+WORKDIR /root/workspace/ws_startup
 
 # Final setup
-COPY ros_entrypoint.sh /sbin/ros_entrypoint.sh
+COPY ros_entrypoint_desktop.sh /sbin/ros_entrypoint.sh
 RUN chmod 755 /sbin/ros_entrypoint.sh && \
     mkdir -p /root/.config/pulse
 
