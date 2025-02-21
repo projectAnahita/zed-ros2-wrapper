@@ -4,11 +4,11 @@ cd $(dirname $0)
 # Default values
 DEFAULT_UBUNTU="ubuntu22.04"
 DEFAULT_CUDA="cuda12.1.0"
-DEFAULT_ZEDSDK="zedsdk4.1.4"
-DEFAULT_DOCKERFILE="Dockerfile.desktop_cuda12.1"
-DEFAULT_IMAGE_NAME="zed_ros2_desktop_image"
+DEFAULT_ZEDSDK="zedsdk4.2.5"
+DEFAULT_DOCKERFILE="Dockerfile.desktop_cuda12_zed4.2.x"
+DEFAULT_IMAGE_NAME="cuda12.1_ros2_desktop_zed4.2.5"
 USE_CACHE=true
-TAG="latest4p"
+TAG="latest"
 
 # Extract version numbers
 ubuntu_version="${DEFAULT_UBUNTU#ubuntu}"

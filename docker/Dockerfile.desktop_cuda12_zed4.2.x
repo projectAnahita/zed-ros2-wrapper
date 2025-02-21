@@ -4,8 +4,8 @@ ARG CUDA_MAJOR=12
 ARG CUDA_MINOR=1
 ARG CUDA_PATCH=0
 ARG ZED_SDK_MAJOR=4
-ARG ZED_SDK_MINOR=1
-ARG ZED_SDK_PATCH=4
+ARG ZED_SDK_MINOR=2
+ARG ZED_SDK_PATCH=5
 
 ARG IMAGE_NAME=nvcr.io/nvidia/cuda:${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}-devel-ubuntu${UBUNTU_MAJOR}.${UBUNTU_MINOR}
 
@@ -123,16 +123,18 @@ COPY tmp_sources/ ./
 
 WORKDIR /root/workspace/ws_zed
 
-RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
-    apt-get update -y || true && \
-    rosdep update && \
-    rosdep install --from-paths src --ignore-src -r -y && \
-    rm -rf /var/lib/apt/lists/* && \
-    colcon build --parallel-workers $(nproc) --symlink-install \
-        --event-handlers console_direct+ --base-paths src \
-        --cmake-args ' -DCMAKE_BUILD_TYPE=Release' \
-        ' -DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs' \
-        ' -DCMAKE_CXX_FLAGS="-Wl,--allow-shlib-undefined"'
+RUN /bin/bash -c "source /opt/ros/$ROS_DISTRO/setup.bash && \
+  apt-get update -y || true && rosdep update && \
+  rosdep install --from-paths src --ignore-src -r -y && \
+  colcon build --parallel-workers $(nproc) --symlink-install \
+  --event-handlers console_direct+ --base-paths src \
+  --cmake-args ' -DCMAKE_BUILD_TYPE=Release' \
+  ' -DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs' \
+  ' -DCMAKE_CXX_FLAGS="-Wl,--allow-shlib-undefined"' " && \
+  rm -rf /var/lib/apt/lists/*
+
+# Stay as root for consistent ownership
+WORKDIR /root/workspace/ws_startup/artifex
 
 # Set up Python virtual environment and install packages
 RUN python3 -m venv /opt/venv && \

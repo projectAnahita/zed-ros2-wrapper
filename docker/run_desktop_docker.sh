@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Default values
-DEFAULT_IMAGE_NAME="cuda12_1_ros2_desktop"
+DEFAULT_IMAGE_NAME="cuda12.1_ros2_desktop_zed4.2.5"
 DEFAULT_TAG="latest"
 # DEFAULT_IMAGE_NAME="zed_ros2_desktop_image"
 # DEFAULT_TAG="latestppp"
