@@ -5,51 +5,51 @@ DEFAULT_IMAGE_NAME="zed_ros2_l4t_35.3.1_sdk_4.2.5"
 DEFAULT_TAG="latest"
 DETACH="false"
 
-# Help function
-show_help() {
-    echo "Usage: $0 [OPTIONS]"
-    echo
-    echo "Run Docker container for ZED ROS2 Desktop"
-    echo
-    echo "Options:"
-    echo "  -h, --help              Show this help message"
-    echo "  -i, --image NAME        Specify Docker image name (default: $DEFAULT_IMAGE_NAME)"
-    echo "  -t, --tag TAG           Specify Docker image tag (default: $DEFAULT_TAG)"
-    echo "  -d, --detach           Run container in background (default: $DETACH)"
-    echo
-    echo "Examples:"
-    echo "  $0 --image custom_image --tag latest"
-    echo "  $0 -i my_image -t dev"
-    echo "  $0 -d  # Run in background"
-    echo "  $0     # Run in foreground"
-}
+# # Help function
+# show_help() {
+#     echo "Usage: $0 [OPTIONS]"
+#     echo
+#     echo "Run Docker container for ZED ROS2 Desktop"
+#     echo
+#     echo "Options:"
+#     echo "  -h, --help              Show this help message"
+#     echo "  -i, --image NAME        Specify Docker image name (default: $DEFAULT_IMAGE_NAME)"
+#     echo "  -t, --tag TAG           Specify Docker image tag (default: $DEFAULT_TAG)"
+#     echo "  -d, --detach           Run container in background (default: $DETACH)"
+#     echo
+#     echo "Examples:"
+#     echo "  $0 --image custom_image --tag latest"
+#     echo "  $0 -i my_image -t dev"
+#     echo "  $0 -d  # Run in background"
+#     echo "  $0     # Run in foreground"
+# }
 
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        -i|--image)
-            DEFAULT_IMAGE_NAME="$2"
-            shift 2
-            ;;
-        -t|--tag)
-            DEFAULT_TAG="$2"
-            shift 2
-            ;;
-        -d|--detach)
-            DETACH="true"
-            shift
-            ;;
-        *)
-            echo "Unknown option: $1"
-            show_help
-            exit 1
-            ;;
-    esac
-done
+# # Parse command line arguments
+# while [[ $# -gt 0 ]]; do
+#     case $1 in
+#         -h|--help)
+#             show_help
+#             exit 0
+#             ;;
+#         -i|--image)
+#             DEFAULT_IMAGE_NAME="$2"
+#             shift 2
+#             ;;
+#         -t|--tag)
+#             DEFAULT_TAG="$2"
+#             shift 2
+#             ;;
+#         -d|--detach)
+#             DETACH="true"
+#             shift
+#             ;;
+#         *)
+#             echo "Unknown option: $1"
+#             show_help
+#             exit 1
+#             ;;
+#     esac
+# done
 
 # Set detach flag
 DOCKER_FLAGS="-it"  # Always interactive
@@ -81,6 +81,7 @@ docker run --network host --gpus all --runtime nvidia $DOCKER_FLAGS --privileged
   -e HF_HOME=/root/.cache/huggingface \
   -v /dev:/dev \
   -v /dev/shm:/dev/shm \
+  -v /tmp:/tmp \
   -v /tmp/.X11-unix/:/tmp/.X11-unix:rw \
   -v /var/nvidia/nvcam/settings/:/var/nvidia/nvcam/settings/ \
   -v /etc/systemd/system/zed_x_daemon.service:/etc/systemd/system/zed_x_daemon.service \

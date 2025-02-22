@@ -27,7 +27,7 @@ echo "---------------------"
 echo "ZED ROS2 Docker Image (Jetson)"
 echo "---------------------"
 echo 'To start a ZED camera node:'
-echo 'ros2 launch zed_wrapper zed_camera.launch.py camera_model:=<zed|zedm|zed2|zed2i|zedx|zedxm|zedxonegs|zedxone4k>'
+echo '  ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zedxm'
 echo "ROS distro: ${ROS_DISTRO:-Not Set}"
 echo "DDS middleware: ${RMW_IMPLEMENTATION:-Not Set}"
 echo "ROS2 Workspaces: ${COLCON_PREFIX_PATH:-Not Set}"
